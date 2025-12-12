@@ -27,8 +27,7 @@ end_duration_pattern = re.compile(
     r"^(?:\d{4}-\d{2}-\d{2}\s+)?"                # optional date
     r"(?P<end>\d{1,2}:\d{2}:\d{2})"
     r".*?history\sregistration\sfinished"
-    r"(?:\safter\s*(?P<duration>\d{1,2}:\d{2}:\d{2}(?:\.\d+)?.*$|\d{2}\.\d{3}.*$))?$",
-    #r"(?:\safter\s((?P<duration_h>\d{1,2}:\d{2}:\d{2})(?:.*)?|(?P<durations_s>\d{2}\.\d{3})\ss)$)?$","
+    r"(?:\safter\s((?P<duration_h>\d{1,2}:\d{2}:\d{2})(?:.*)?|(?P<duration_s>\d{2}\.\d{3})\ss))?$",
     re.IGNORECASE
 )
 
@@ -71,9 +70,12 @@ def extract_data(file_path) -> str|None:
                     match_ed = end_duration_pattern.search(lines[-1].rstrip())
                     if match_ed:
                         end: str|None = match_ed.group("end")
-                        duration: str|None = match_ed.group("duration")
-                        if duration:
-                            duration = duration.replace("hours", "h")
+                        duration_h: str|None = match_ed.group("duration_h")
+                        duration_s: str|None = match_ed.group("duration_s")
+                        if duration_h:
+                            duration = f"{duration_h} h"
+                        elif duration_s:
+                            duration = f"{duration_s} s"
                         else:
                             # TODO: calculate duration
                             pass
