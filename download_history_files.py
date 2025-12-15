@@ -7,7 +7,6 @@ from pathlib import Path
 from time import sleep
 from termcolor import colored
 
-
 import os
 import subprocess
 import getpass
