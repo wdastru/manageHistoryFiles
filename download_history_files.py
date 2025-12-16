@@ -3,11 +3,14 @@ import subprocess
 import os
 from pathlib import Path
 from time import sleep
+from attr import attrs
 from termcolor import colored
 import glob
 import re
 import shutil
 import gzip
+
+rsync_count = 1
 
 KEYS = [
     "~/.ssh/id_rsa-centos5",
@@ -108,6 +111,88 @@ def rotate_numbered_backup_logrotate(dest_file: Path,
         # Remove the uncompressed .1
         first_rotation.unlink()
 
+def rsync_files(host, app, username):
+    global rsync_count
+
+    remote_path = f"/opt/{app}/prog/curdir/{username}/"
+    remote_spec = f"{user}@{host}:{remote_path}"
+    dest_dir = Path(f"./{host}/{app}/{username}/.")
+    
+    cmd = [
+        "rsync", 
+        "-av", 
+        "--checksum",
+        "--itemize-changes",
+        "--backup",
+        "--suffix=.1",
+        "--out-format=%i %n%L",
+        "--dry-run",
+    ]
+
+    if host == "AV600":
+        cmd.append("-e ssh -oKexAlgorithms=+diffie-hellman-group1-sha1 -oHostKeyAlgorithms=+ssh-dss")
+        
+    cmd.extend(
+            [
+                f"{remote_spec}history",
+                f"{remote_spec}history.old",
+                str(dest_dir)
+            ]
+        )
+
+    print(f"-> [{rsync_count}] Running:", " ".join(cmd))
+    
+    n_tries = 1
+    while True:
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        
+        ## Basic rsync diagnostics
+        #print("Return code:", res.returncode)
+        #if res.stderr:
+        #    print("STDERR:\n", res.stderr)
+        #
+        ## Full rsync output (human-readable but parseable)
+        #print("STDOUT:\n", res.stdout)
+        
+        changed = False
+        lines = res.stdout.splitlines()
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            # Expect lines like: ">f..t...... some/path/file.ext"
+            # First token is the %i field; everything after space is the name.
+            parts = line.split(maxsplit=1)
+            if not parts:
+                continue
+            flags = parts[0]
+            # Updated/transfer markers:
+            #   startswith(">f") means rsync would write/transfer a file to dst
+            # (You can tighten this to only count content changes if needed)
+            filename: str|None = None
+            if len(parts) > 1:
+                if flags.startswith(">f"):
+                    changed = True
+                    filename = parts[1]
+                    break
+
+        if res.returncode == 0:
+            print(f"{colored('[ OK  ]', 'green', attrs=['bold'])} Try {n_tries}: synced {host}/{app}/{username}\n")
+            break
+        elif res.returncode == 23:
+            print(f"{colored('[WARN ]', 'yellow', attrs=['bold'])} Try {n_tries}: missing files for {host}/{app}/{username}; continuing.\n")
+            break
+        else:
+            print(f"{colored('[ERROR]', 'cyan', attrs=['bold'])} Try {n_tries}: rsync failed (rc={res.returncode}): {res.stderr.strip()}")
+            print("Retrying in 60 seconds...")
+            sleep(60)
+            if n_tries >= 10:
+                print(f"{colored('[FATAL]', 'red', attrs=['bold'])} Try {n_tries}: rsync failed after {n_tries} attempts; moving to next.\n")
+                break
+            n_tries += 1
+    
+    rsync_count += 1
+
 start_ssh_agent_if_needed()
 
 if not agent_has_identities():
@@ -170,8 +255,6 @@ REMOTES_DATA = [
     }
 ]
 
-rsync_count = 1
-
 for remote in REMOTES_DATA:
     host = remote["host"]
 
@@ -194,8 +277,8 @@ for remote in REMOTES_DATA:
         print(f"\n    *** Processing {app}... ***\n")
 
         for username in usernames:
-            remote_path = f"/opt/{app}/prog/curdir/{username}/"
-            remote_spec = f"{user}@{host}:{remote_path}"
+            #remote_path = f"/opt/{app}/prog/curdir/{username}/"
+            #remote_spec = f"{user}@{host}:{remote_path}"
             dest_dir = Path(f"./{host}/{app}/{username}/.")
 
             if not dest_dir.exists():
@@ -203,80 +286,34 @@ for remote in REMOTES_DATA:
                 print(f"Created directory: {dest_dir}")
             else:
                 print(f"Directory already exists: {dest_dir}")
-                # Matches 'name.<number>' or 'name.<number>.gz' (for compressed rotations)
-                #_suffix_re = re.compile(r"\.(\d+)$")
-                _suffix_re = re.compile(r"\.(?P<number>\d+)(?:\.gz)?$")
-                
-                max_n = 0
-                # Look for files named 'stem.<n>' and 'stem.<n>.gz' in the same directory
-                for p in dest_dir.glob("*"):
-                    m = _suffix_re.search(p.name)
-                    if m :
-                        try:
-                            n = int(m.group("number"))
-                            if n > max_n:
-                                max_n = n
-                        except ValueError:
-                            pass
-                
-                if max_n != 0:
-                    print(f"  Existing backups found up to .{max_n} in {dest_dir}")
-                    rotate_numbered_backup_logrotate(
-                        dest_file=f"{dest_dir}/history",
-                        max_rotations = 3,
-                        compress=False,
-                        )
 
-            cmd = [
-                "rsync", 
-                "-av", 
-                "--dry-run",
-                "--checksum",
-                "--itemize-changes",
-                "--backup",
-                "--suffix=.1",
-            ]
-            if host == "AV600":
-                cmd.append("-e ssh -oKexAlgorithms=+diffie-hellman-group1-sha1 -oHostKeyAlgorithms=+ssh-dss")
-                
-            cmd.extend(
-                    [
-                        f"{remote_spec}history",
-                        f"{remote_spec}history.old",
-                        str(dest_dir)
-                    ]
+            # Matches 'name.<number>' or 'name.<number>.gz' (for compressed rotations)
+            #_suffix_re = re.compile(r"\.(\d+)$")
+            _suffix_re = re.compile(r"\.(?P<number>\d+)(?:\.gz)?$")
+            
+            max_n = 0
+            # Look for files named 'stem.<n>' and 'stem.<n>.gz' in the same directory
+            for p in dest_dir.glob("*"):
+                m = _suffix_re.search(p.name)
+                if m :
+                    try:
+                        n = int(m.group("number"))
+                        if n > max_n:
+                            max_n = n
+                    except ValueError:
+                        pass
+            
+            rsync_files(
+                host=host,
+                app=app,
+                username=username,
                 )
-
-            print(f"-> [{rsync_count}] Running:", " ".join(cmd))
             
-            n_tries = 1
-            while True:
-                res = subprocess.run(cmd, capture_output=True, text=True)
+            if max_n != 0: # there exists at least one local backup
+                print(f"  Existing backups found up to .{max_n} in {dest_dir}")
                 
-                ## Basic rsync diagnostics
-                #print("Return code:", res.returncode)
-                #if res.stderr:
-                #    print("STDERR:\n", res.stderr)
-                #
-                ## Full rsync output (human-readable but parseable)
-                #print("STDOUT:\n", res.stdout)
-
-                if res.returncode == 0:
-                    print(f"{colored("[ OK  ]",(0, 255, 0), attrs=['bold'])} Try {n_tries}: synced {host}/{app}/{username}\n")
-                    break
-                elif res.returncode == 23:
-                    print(f"{colored("[WARN ]",(255, 255, 0), attrs=['bold'])} Try {n_tries}: missing files for {host}/{app}/{username}; continuing.\n")
-                    break
-                else:
-                    print(f"{colored("[ERROR]",(0, 255, 255), attrs=['bold'])} Try {n_tries}: rsync failed (rc={res.returncode}): {res.stderr.strip()}")
-                    print("Retrying in 60 seconds...")
-                    sleep(60)
-                    if n_tries >= 10:
-                        print(f"{colored("[FATAL]",(255, 0, 0), attrs=['bold'])} Try {n_tries}: rsync failed after {n_tries} attempts; moving to next.\n")
-                        break
-                    n_tries += 1
-            
-            rsync_count += 1
-
-            
-
+                #rotate_numbered_backup_logrotate(
+                #    dest_file=f"{dest_dir}/history",
+                #    max_rotations = 3,
+                #    compress=False,
+                #    )
