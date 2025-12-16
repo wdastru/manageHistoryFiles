@@ -118,9 +118,9 @@ def extract_data(raw_lines) -> str|None:
                         match_e = end_pattern.search(line.rstrip())
                         if match_e:
                             end: str|None = match_e.group("end")
-                            return date, start, end, "N/A"
-                        else:
-                            return date, start, "N/A", "N/A"
+                            duration = calculate_duration(lines, date, start, end)
+                            return date, start, end, duration
+                        continue
             else:
                 return None, None, None, None
         else:
