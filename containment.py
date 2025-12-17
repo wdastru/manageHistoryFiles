@@ -13,7 +13,8 @@ def run_containment(dir_path: str|Path):
     files_with_sizes = [(p, p.stat().st_size) for p in dir_path.glob("*") if p.is_file()]
     # Sort by size (descending)
     files_sorted = sorted(files_with_sizes, key=lambda x: x[1], reverse=True)
-    
+    to_be_deleted = set()
+
     for big_file in files_sorted:
         for small_file in reversed(files_sorted):
             if big_file[1] <= small_file[1]:
@@ -23,7 +24,10 @@ def run_containment(dir_path: str|Path):
                 big = f2.read()
                 if is_contained(small, big):
                     print(f"{dir_path}/{small_file[0].name} will be deleted (contained in {big_file[0].name})")
-                    (dir_path / small_file[0].name).unlink()                    
+                    to_be_deleted.add(dir_path / small_file[0].name)
+                    
+    for file_path in to_be_deleted:
+        file_path.unlink()
 
 def main():
     import sys
