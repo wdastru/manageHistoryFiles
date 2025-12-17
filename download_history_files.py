@@ -9,6 +9,7 @@ import glob
 import re
 import shutil
 import gzip
+from containment import is_contained, run_containment
 
 rsync_count = 1
 
@@ -334,3 +335,5 @@ for remote in REMOTES_DATA:
                 app=app,
                 username=username,
                 )
+            
+            run_containment(dest_dir)
