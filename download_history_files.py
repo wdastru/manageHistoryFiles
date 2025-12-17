@@ -44,7 +44,7 @@ def add_key_with_passphrase(key_path):
     subprocess.check_call(["ssh-add", key_path])
 
 def rotate_numbered_backup_logrotate(dest_file: Path,
-                                     max_rotations: int = 3,
+                                     max_rotations: int = 10,
                                      compress: bool = False):
     """
     Logrotate-like rotation:
@@ -177,9 +177,10 @@ def rsync_files(host, app, username):
         # (You can tighten this to only count content changes if needed)
         filename: str|None = None
         if len(parts) > 1:
-            if flags.startswith(">fc"):
 
-                filename = parts[1]
+            filename = parts[1]
+
+            if flags.startswith(">fc"):
 
                 # Matches 'name.<number>' or 'name.<number>.gz' (for compressed rotations)
                 #_suffix_re = re.compile(r"\.(\d+)$")
@@ -187,7 +188,7 @@ def rsync_files(host, app, username):
                 
                 max_n = 0
                 # Look for files named 'stem.<n>' and 'stem.<n>.gz' in the same directory
-                for p in dest_dir.glob("*"):
+                for p in dest_dir.glob(f"{filename}*"):
                     m = _suffix_re.search(p.name)
                     if m :
                         try:
@@ -198,7 +199,7 @@ def rsync_files(host, app, username):
                             pass
 
                 if max_n != 0: # there exists at least one local backup
-                    print(f"  Existing backups found up to .{max_n} in {dest_dir}")
+                    print(f"  Existing backups found up to {filename}.{max_n} in {dest_dir}")
                     
                     rotate_numbered_backup_logrotate(
                         dest_file=f"{dest_dir}/{filename}",
@@ -213,7 +214,7 @@ def rsync_files(host, app, username):
                     res = subprocess.run(cmd, capture_output=True, text=True)
 
                     if res.returncode == 0:
-                        print(f"{colored('[ OK  ]', 'green', attrs=['bold'])} Try {n_tries}: synced {host}/{app}/{username}/{filename}\n")
+                        print(f"{colored('[ OK  ]', 'green', attrs=['bold'])} Try {n_tries}: {host}/{app}/{username}/{filename} synced")
                         break
                     elif res.returncode == 23:
                         print(f"{colored('[WARN ]', 'yellow', attrs=['bold'])} Try {n_tries}: missing file {host}/{app}/{username}/{filename}; continuing.\n")
@@ -226,10 +227,12 @@ def rsync_files(host, app, username):
                             print(f"{colored('[FATAL]', 'red', attrs=['bold'])} Try {n_tries}: rsync of {host}/{app}/{username}/{filename} failed after {n_tries} attempts; moving to next.\n")
                             break
                         n_tries += 1
-                    
+
             elif flags.startswith(".f"):
-                break
-    
+                print(f"{colored('[ OK  ]', 'white', attrs=['bold'])} {host}/{app}/{username}/{filename} is already up to date.")
+            
+            continue
+
     rsync_count += 1
 
 start_ssh_agent_if_needed()
@@ -297,13 +300,13 @@ REMOTES_DATA = [
 for remote in REMOTES_DATA:
     host = remote["host"]
 
-    if host in [
-        '''"AV600-nmrsu"''', 
-        "AV300", 
-        "AvanceNeo400", 
-        "PharmaScan",
-        ] :
-        continue
+    #if host in [
+    #    '''"AV600-nmrsu"''', 
+    #    "AV300", 
+    #    "AvanceNeo400", 
+    #    "PharmaScan",
+    #    ] :
+    #    continue
 
     print(f"\n### Processing {host}...")
 
