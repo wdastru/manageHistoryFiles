@@ -1,7 +1,7 @@
 import os
 import re
 import datetime
-from datetime import datetime
+from datetime import timedelta, datetime
 import pandas as pd
 
 # Matches .../<host>/<app>/<user>/history or history.old at the END of the path
@@ -136,6 +136,20 @@ def extract_data(raw_lines) -> str|None:
         print(f"Exception caught: {e}")
         return None, None, None, None
 
+def normalize_time(value: str) -> str:
+    value = value.strip().lower()
+    if value.endswith('h'):  # e.g., "14:56:45 h"
+        # Remove 'h' and return as HH:MM:SS
+        return value.replace(' h', '')
+    elif value.endswith('s'):  # e.g., "29.442 s"
+        # Extract seconds, discard milliseconds
+        seconds = float(value.replace(' s', ''))
+        whole_seconds = int(round(seconds))  # discard ms
+        # Convert to HH:MM:SS
+        return str(timedelta(seconds=whole_seconds))
+    else:
+        return value  # fallback
+
 if __name__ == "__main__":
     records = []  # collect rows here
     results = find_history_files(".")
@@ -170,7 +184,7 @@ if __name__ == "__main__":
                                 
                                 #print(f"Processing buffer {buffer_number}")
                                 date, start, end, duration = extract_data(buffer)
-                                print(f"Found {host}/{app}/{user} -> {file} ({date}, {start}, {end}, {duration})")
+                                print(f"Found {host}/{app}/{user} -> {file} ({date}, {start}, {end}, {normalize_time(duration)})")
                                 
                                 # append a structured record
                                 records.append({
@@ -178,10 +192,10 @@ if __name__ == "__main__":
                                     "app": app,
                                     "user": user,
                                     "file": file,
-                                    "date": date,         # ideally a datetime.date / str in ISO format
+                                    "date": date,                         # ideally a datetime.date / str in ISO format
                                     "start": start,       # ideally a datetime / time / str in ISO
                                     "end": end,           # ideally a datetime.date / str in ISO format
-                                    "duration": duration  # seconds, HH:MM:SS, etc.
+                                    "duration": normalize_time(duration)  # seconds, HH:MM:SS, etc.
                                 })
 
                                 buffer_number += 1
