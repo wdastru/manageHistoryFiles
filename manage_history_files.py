@@ -42,6 +42,11 @@ end_duration_pattern = re.compile(
 
 def find_history_files(start_dir="."):
     target_names = {"history", "history.old"}
+    # Add history.old.n for n = 1..10
+    for n in range(1, 11):
+        target_names.add(f"history.{n}")
+        target_names.add(f"history.old.{n}")
+
     matches = []
 
     for root, dirs, files in os.walk(start_dir):
@@ -150,10 +155,12 @@ if __name__ == "__main__":
             with open(path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
                 buffer_number = 1
-                for raw_line in lines:
+                
+                for i, raw_line in enumerate(lines):
+                   
                     line = raw_line.rstrip("\n")
                     if line:
-                        if date_time_start_pattern.match(line.lstrip()) or raw_line == lines[-1]:
+                        if date_time_start_pattern.match(line.lstrip()) or (i == len(lines) - 1):
                             # processa buffer precedente
                             if buffer:
                                 if raw_line == lines[-1]:

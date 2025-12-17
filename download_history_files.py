@@ -203,7 +203,7 @@ def rsync_files(host, app, username):
                     
                     rotate_numbered_backup_logrotate(
                         dest_file=f"{dest_dir}/{filename}",
-                        max_rotations = 3,
+                        max_rotations = 10,
                         compress=False,
                         )
                 
