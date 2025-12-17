@@ -2,6 +2,7 @@ import os
 import re
 import datetime
 from datetime import datetime
+import pandas as pd
 
 # Matches .../<host>/<app>/<user>/history or history.old at the END of the path
 host_app_user_pattern = re.compile(
@@ -136,6 +137,7 @@ def extract_data(raw_lines) -> str|None:
         return None, None, None, None
 
 if __name__ == "__main__":
+    records = []  # collect rows here
     results = find_history_files(".")
     for path in results:
         match = host_app_user_pattern.search(path)
@@ -169,6 +171,19 @@ if __name__ == "__main__":
                                 #print(f"Processing buffer {buffer_number}")
                                 date, start, end, duration = extract_data(buffer)
                                 print(f"Found {host}/{app}/{user} -> {file} ({date}, {start}, {end}, {duration})")
+                                
+                                # append a structured record
+                                records.append({
+                                    "host": host,
+                                    "app": app,
+                                    "user": user,
+                                    "file": file,
+                                    "date": date,         # ideally a datetime.date / str in ISO format
+                                    "start": start,       # ideally a datetime / time / str in ISO
+                                    "end": end,           # ideally a datetime.date / str in ISO format
+                                    "duration": duration  # seconds, HH:MM:SS, etc.
+                                })
+
                                 buffer_number += 1
 
                                 buffer = line + "\n"   # start new buffer
@@ -178,3 +193,7 @@ if __name__ == "__main__":
                         else:
                             # riga di continuazione
                             buffer += line + "\n"
+    
+    # export to Excel
+    df = pd.DataFrame(records)
+    df.to_excel("history_files_summary.xlsx", index=False, engine="openpyxl")
