@@ -230,11 +230,26 @@ def rsync_files(host, app, username):
                         n_tries += 1
 
             elif flags.startswith(".f"):
-                print(f"{colored('[ OK  ]', 'white', attrs=['bold'])} {host}/{app}/{username}/{filename} is already up to date.")
+                print(f"{colored('[ --- ]', 'white', attrs=['bold'])} {host}/{app}/{username}/{filename} is already up to date.")
             
+            else:
+                print(f"{colored('[WARN ]', 'yellow', attrs=['bold'])} Try {n_tries}: no file {host}/{app}/{username}/{filename}; continuing.\n")
+
             continue
 
     rsync_count += 1
+
+def is_host_reachable(host: str) -> bool:
+    try:
+        # For Linux/WSL: use '-c 1' for one packet
+        result = subprocess.run(
+            ["ping", "-c", "1", host],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 start_ssh_agent_if_needed()
 
@@ -247,6 +262,7 @@ else:
 REMOTES_DATA = [
     {
         "host": "AV600-nmrsu",
+        "ip": "130.192.221.166",
         "user": "nmrsu",
         "apps": ["topspin"],
         "usernames": [
@@ -258,6 +274,7 @@ REMOTES_DATA = [
     },
     {
         "host": "AV300",
+        "ip": "130.192.221.70",
         "user": "root",
         "apps": [
             "PV-360.1.1",
@@ -274,6 +291,7 @@ REMOTES_DATA = [
     },
     {
         "host": "AvanceNeo400",
+        "ip": "192.168.186.31",
         "user": "nmrsu",
         "apps": [
             "topspin4.3.0",
@@ -285,6 +303,7 @@ REMOTES_DATA = [
     },
     {
         "host": "PharmaScan",
+        "ip": "192.168.186.11",
         "user": "root",
         "apps": [
             "topspin4.0.6",
@@ -301,15 +320,11 @@ REMOTES_DATA = [
 for remote in REMOTES_DATA:
     host = remote["host"]
 
-    #if host in [
-    #    '''"AV600-nmrsu"''', 
-    #    "AV300", 
-    #    "AvanceNeo400", 
-    #    "PharmaScan",
-    #    ] :
-    #    continue
-
-    print(f"\n### Processing {host}...")
+    if not is_host_reachable(remote["ip"]):
+        print(f"\n### Host {host} is not reachable...")
+        continue
+    else:
+        print(f"\n### Processing {host}...")
 
     user = remote["user"]
     apps = remote["apps"]
@@ -320,8 +335,6 @@ for remote in REMOTES_DATA:
         print(f"\n    *** Processing {app}... ***\n")
 
         for username in usernames:
-            #remote_path = f"/opt/{app}/prog/curdir/{username}/"
-            #remote_spec = f"{user}@{host}:{remote_path}"
             dest_dir = Path(f"./{host}/{app}/{username}/.")
 
             if not dest_dir.exists():
