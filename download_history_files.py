@@ -118,7 +118,7 @@ def rsync_files(host, app, username):
     remote_path = f"/opt/{app}/prog/curdir/{username}/"
     remote_spec = f"{user}@{host}:{remote_path}"
     dest_dir = Path(f"./{host}/{app}/{username}/.")
-    
+
     cmd = [
         "rsync", 
         "--dry-run",
@@ -141,8 +141,6 @@ def rsync_files(host, app, username):
             ]
         )
 
-    print(f"-> [{rsync_count}] Running:", " ".join(cmd))
-    
     res = subprocess.run(cmd, capture_output=True, text=True)
     
     ## Basic rsync diagnostics
@@ -157,10 +155,30 @@ def rsync_files(host, app, username):
         cmd.pop(cmd.index("--dry-run"))
 
     lines = res.stdout.splitlines()
-    for line in lines:
+    print_once = True
+    history_not_found = True
+    for i, line in enumerate(lines):
         line = line.strip()
-        if not line or line.find("history") == -1:
+
+        if not line: # empty line
             continue
+            
+        if line.find("history") == -1: # not a history file line
+            if (i == len(lines) - 1) and history_not_found: # last line and NO history file found
+                print(f"{colored('[WARN ]', 'yellow', attrs=['bold'])} no history file found for {host}/{app}/{username}")
+            continue
+        else:
+            history_not_found = False
+        
+        if print_once:
+            if not dest_dir.exists():
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                print(f"Created directory: {dest_dir}")
+            else:
+                print(f"Directory already exists: {dest_dir}")
+
+            print(f"-> [{rsync_count}] Running:", " ".join(cmd))
+            print_once = False
 
         _re = re.compile(rf"^{re.escape(user)}@{re.escape(host)}:.*$")
         for item in reversed(cmd):
@@ -217,9 +235,6 @@ def rsync_files(host, app, username):
                     if res.returncode == 0:
                         print(f"{colored('[ OK  ]', 'green', attrs=['bold'])} Try {n_tries}: {host}/{app}/{username}/{filename} synced")
                         break
-                    elif res.returncode == 23:
-                        print(f"{colored('[WARN ]', 'yellow', attrs=['bold'])} Try {n_tries}: missing file {host}/{app}/{username}/{filename}; continuing.\n")
-                        break
                     else:
                         print(f"{colored('[ERROR]', 'cyan', attrs=['bold'])} Try {n_tries}: rsync failed for {host}/{app}/{username}/{filename} (rc={res.returncode}): {res.stderr.strip()}")
                         print("Retrying in 60 seconds...")
@@ -231,13 +246,12 @@ def rsync_files(host, app, username):
 
             elif flags.startswith(".f"):
                 print(f"{colored('[ --- ]', 'white', attrs=['bold'])} {host}/{app}/{username}/{filename} is already up to date.")
-            
-            else:
-                print(f"{colored('[WARN ]', 'yellow', attrs=['bold'])} Try {n_tries}: no file {host}/{app}/{username}/{filename}; continuing.\n")
 
             continue
 
     rsync_count += 1
+
+    run_containment(dest_dir)
 
 def is_host_reachable(host: str) -> bool:
     try:
@@ -335,18 +349,9 @@ for remote in REMOTES_DATA:
         print(f"\n    *** Processing {app}... ***\n")
 
         for username in usernames:
-            dest_dir = Path(f"./{host}/{app}/{username}/.")
-
-            if not dest_dir.exists():
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                print(f"Created directory: {dest_dir}")
-            else:
-                print(f"Directory already exists: {dest_dir}")
-
+            
             rsync_files(
                 host=host,
                 app=app,
                 username=username,
                 )
-            
-            run_containment(dest_dir)
