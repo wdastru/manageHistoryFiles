@@ -103,14 +103,14 @@ def extract_data(raw_lines) -> str|None:
                     else:
                         duration = calculate_duration(lines, date, start, end)
                         
-                    return date, start, end, duration
+                    return date, start, end, normalize_time(duration)
                 else:
                     for line in reversed(lines):
                         match_e = end_pattern.search(line.rstrip())
                         if match_e:
                             end: str|None = match_e.group("end")
                             duration = calculate_duration(lines, date, start, end)
-                            return date, start, end, duration
+                            return date, start, end, normalize_time(duration)
                         continue
             else:
                 return None, None, None, None
@@ -169,7 +169,7 @@ if __name__ == "__main__":
                                 
                                 #print(f"Processing buffer {buffer_number}")
                                 date, start, end, duration = extract_data(buffer)
-                                print(f"Found {host}/{app}/{user} -> {file} ({date}, {start}, {end}, {normalize_time(duration)})")
+                                print(f"Found {host}/{app}/{user} -> {file} ({date}, {start}, {end}, {duration})")
                                 
                                 # append a structured record
                                 records.append({
@@ -180,7 +180,7 @@ if __name__ == "__main__":
                                     "date": date,                         # ideally a datetime.date / str in ISO format
                                     "start": start,       # ideally a datetime / time / str in ISO
                                     "end": end,           # ideally a datetime.date / str in ISO format
-                                    "duration": normalize_time(duration)  # seconds, HH:MM:SS, etc.
+                                    "duration": duration  # seconds, HH:MM:SS, etc.
                                 })
 
                                 buffer_number += 1
@@ -199,4 +199,22 @@ if __name__ == "__main__":
     df["start"] = pd.to_timedelta(df["start"], errors='coerce')
     df["end"] = pd.to_timedelta(df["end"], errors='coerce')
     df["duration"] = pd.to_timedelta(df["duration"], errors='coerce')
-    df.to_excel("history_files_summary.xlsx", index=False, engine="openpyxl")
+
+    with pd.ExcelWriter("history_files_summary.xlsx", engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="History")
+        ws = writer.sheets["History"]
+
+        # Map column names → desired Excel formats
+        formats = {
+            "date": "yyyy-mm-dd",
+            "start": "hh:mm:ss",
+            "end": "hh:mm:ss",
+            "duration": "hh:mm:ss",
+        }
+
+        for col_name, col_idx in zip(df.columns, range(1, len(df.columns) + 1)):
+            if col_name in formats:
+                fmt = formats[col_name]
+                (col_cells,) = ws.iter_cols(min_col=col_idx, max_col=col_idx)
+                for cell in col_cells:
+                    cell.number_format = fmt
