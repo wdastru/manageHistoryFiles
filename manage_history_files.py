@@ -42,13 +42,13 @@ end_duration_pattern = re.compile(
     re.IGNORECASE
 )
 
-def calculate_duration(lines: list, date:str, start: str, end: str) -> str|None:
+def calculate_duration(lines: list, date_start:str, start: str, end: str) -> list[str|None]:
     new_date:str|None = None
     for line in reversed(lines):
         match_nd = date_time_start_pattern.search(line.rstrip())
         if match_nd:
             new_date = match_nd.group("date")
-            if new_date != date:
+            if new_date != date_start:
                 break
             else:
                 new_date = None
@@ -57,9 +57,9 @@ def calculate_duration(lines: list, date:str, start: str, end: str) -> str|None:
     if new_date:
         date_end = f"{new_date}, {end}"
     else:
-        date_end = f"{date}, {end}"
+        date_end = f"{date_start}, {end}"
 
-    date_start = f"{date}, {start}"
+    date_start = f"{date_start}, {start}"
     
     duration_fmt = "%Y-%m-%d, %H:%M:%S"
     
@@ -70,21 +70,27 @@ def calculate_duration(lines: list, date:str, start: str, end: str) -> str|None:
         hours, remainder = divmod(elapsed.total_seconds(), 3600)
         minutes, seconds = divmod(remainder, 60)
         duration = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02} h" 
-        return duration
+        return [date_end.split(",")[0], duration]
 
     except ValueError:
         print(f"Error parsing dates in buffer.")
-        return "Error"
-
+        return ["Error", "Error"]
+    
 def extract_data(raw_lines) -> str|None:
+    date_start: str|None
+    date_end: str|None
+    start: str|None
+    end: str|None
+    duration: str|None
     lines = raw_lines.splitlines()
     try:
         if len(lines) >= 1:
             match_ds = date_time_start_pattern.search(lines[0].rstrip())
             if match_ds:
-                date: str|None = match_ds.group("date")
-                start: str|None = match_ds.group("start")
-                duration: str|None = None
+                date_start = match_ds.group("date")
+                date_end = date_start
+                start = match_ds.group("start")
+                duration = None
                 if not start:
                     match_s = start_pattern.search(lines[2].rstrip())
                     if match_s:
@@ -101,25 +107,25 @@ def extract_data(raw_lines) -> str|None:
                     elif duration_s:
                         duration = f"{duration_s} s"
                     else:
-                        duration = calculate_duration(lines, date, start, end)
-                        
-                    return date, start, end, normalize_time(duration)
+                        date_end, duration = calculate_duration(lines, date_start, start, end)
+
+                    return date_start, date_end, start, end, normalize_time(duration)
                 else:
                     for line in reversed(lines):
                         match_e = end_pattern.search(line.rstrip())
                         if match_e:
                             end: str|None = match_e.group("end")
-                            duration = calculate_duration(lines, date, start, end)
-                            return date, start, end, normalize_time(duration)
+                            date_end, duration = calculate_duration(lines, date_start, start, end)
+                            return date_start, date_end, start, end, normalize_time(duration)
                         continue
             else:
-                return None, None, None, None
+                return None, None, None, None, None
         else:
             print(f"Buffer has less than 3 lines.")
-            return None, None, None, None
+            return None, None, None, None, None
     except Exception as e:
         print(f"Exception caught: {e}")
-        return None, None, None, None
+        return None, None, None, None, None
 
 def normalize_time(value: str) -> str:
     value = value.strip().lower()
@@ -164,12 +170,14 @@ if __name__ == "__main__":
                         if date_time_start_pattern.match(line.lstrip()) or (i == len(lines) - 1):
                             # processa buffer precedente
                             if buffer:
+                                
+                                ### TODO: cosa fa questo check?
                                 if raw_line == lines[-1]:
                                     buffer += line + "\n"
                                 
                                 #print(f"Processing buffer {buffer_number}")
-                                date, start, end, duration = extract_data(buffer)
-                                print(f"Found {host}/{app}/{user} -> {file} ({date}, {start}, {end}, {duration})")
+                                date_start, date_end, start, end, duration = extract_data(buffer)
+                                print(f"Found {host}/{app}/{user} -> {file} ({date_start}, {start}, {date_end}, {end}, {duration})")
                                 
                                 # append a structured record
                                 records.append({
@@ -177,10 +185,11 @@ if __name__ == "__main__":
                                     "app": app,
                                     "user": user,
                                     "file": file,
-                                    "date": date,                         # ideally a datetime.date / str in ISO format
-                                    "start": start,       # ideally a datetime / time / str in ISO
-                                    "end": end,           # ideally a datetime.date / str in ISO format
-                                    "duration": duration  # seconds, HH:MM:SS, etc.
+                                    "date_start": date_start,   # ideally a datetime.date / str in ISO format
+                                    "date_end": date_end,       # ideally a datetime.date / str in ISO format
+                                    "start": start,             # ideally a datetime / time / str in ISO
+                                    "end": end,                 # ideally a datetime.date / str in ISO format
+                                    "duration": duration        # seconds, HH:MM:SS, etc.
                                 })
 
                                 buffer_number += 1
@@ -195,7 +204,8 @@ if __name__ == "__main__":
     
     # export to Excel
     df = pd.DataFrame(records)
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["date_start"] = pd.to_datetime(df["date_start"], errors="coerce")
+    df["date_end"] = pd.to_datetime(df["date_end"], errors="coerce")
     df["start"] = pd.to_timedelta(df["start"], errors='coerce')
     df["end"] = pd.to_timedelta(df["end"], errors='coerce')
     df["duration"] = pd.to_timedelta(df["duration"], errors='coerce')
@@ -206,7 +216,8 @@ if __name__ == "__main__":
 
         # Map column names → desired Excel formats
         formats = {
-            "date": "yyyy-mm-dd",
+            "date_start": "yyyy-mm-dd",
+            "date_end": "yyyy-mm-dd",
             "start": "hh:mm:ss",
             "end": "hh:mm:ss",
             "duration": "hh:mm:ss",
