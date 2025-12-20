@@ -9,7 +9,7 @@ import glob
 import re
 import shutil
 import gzip
-from containment import is_contained, run_containment
+from utils import run_containment, max_index, fill_gaps
 
 rsync_count = 1
 
@@ -45,7 +45,7 @@ def add_key_with_passphrase(key_path):
     subprocess.check_call(["ssh-add", key_path])
 
 def rotate_numbered_backup_logrotate(dest_file: Path,
-                                     max_rotations: int = 10,
+                                     max_rotations: int = 100,
                                      compress: bool = False):
     """
     Logrotate-like rotation:
@@ -201,21 +201,21 @@ def rsync_files(host, app, username):
 
             if flags.startswith(">fc"):
 
-                # Matches 'name.<number>' or 'name.<number>.gz' (for compressed rotations)
-                #_suffix_re = re.compile(r"\.(\d+)$")
-                _suffix_re = re.compile(r"\.(?P<number>\d+)(?:\.gz)?$")
-                
-                max_n = 0
+                max_n = max_index(filename, dest_dir)
                 # Look for files named 'stem.<n>' and 'stem.<n>.gz' in the same directory
-                for p in dest_dir.glob(f"{filename}*"):
-                    m = _suffix_re.search(p.name)
-                    if m :
-                        try:
-                            n = int(m.group("number"))
-                            if n > max_n:
-                                max_n = n
-                        except ValueError:
-                            pass
+                # Matches 'name.<number>' or 'name.<number>.gz' (for compressed rotations)
+                ##_suffix_re = re.compile(r"\.(\d+)$")
+                #_suffix_re = re.compile(r"\.(?P<number>\d+)(?:\.gz)?$")
+                #
+                #for p in dest_dir.glob(f"{filename}*"):
+                #    m = _suffix_re.search(p.name)
+                #    if m :
+                #        try:
+                #            n = int(m.group("number"))
+                #            if n > max_n:
+                #                max_n = n
+                #        except ValueError:
+                #            pass
 
                 if max_n != 0: # there exists at least one local backup
                     print(f"  Existing backups found up to {filename}.{max_n} in {dest_dir}")
@@ -252,6 +252,7 @@ def rsync_files(host, app, username):
     rsync_count += 1
 
     run_containment(dest_dir)
+    fill_gaps(dest_dir)
 
 def is_host_reachable(host: str) -> bool:
     try:

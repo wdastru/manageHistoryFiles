@@ -3,6 +3,7 @@ import re
 import datetime
 from datetime import timedelta, datetime
 import pandas as pd
+from utils import find_history_files
 
 # Matches .../<host>/<app>/<user>/history or history.old at the END of the path
 host_app_user_pattern = re.compile(
@@ -40,22 +41,6 @@ end_duration_pattern = re.compile(
     r"(?:\safter\s((?P<duration_h>\d{1,2}:\d{2}:\d{2})(?:.*)?|(?P<duration_s>\d{2}\.\d{3})\ss))?$",
     re.IGNORECASE
 )
-
-def find_history_files(start_dir="."):
-    target_names = {"history", "history.old"}
-    # Add history.old.n for n = 1..10
-    for n in range(1, 11):
-        target_names.add(f"history.{n}")
-        target_names.add(f"history.old.{n}")
-
-    matches = []
-
-    for root, dirs, files in os.walk(start_dir):
-        for fname in files:
-            if fname in target_names:
-                matches.append(os.path.join(root, fname))
-
-    return matches
 
 def calculate_duration(lines: list, date:str, start: str, end: str) -> str|None:
     new_date:str|None = None
@@ -210,4 +195,8 @@ if __name__ == "__main__":
     
     # export to Excel
     df = pd.DataFrame(records)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["start"] = pd.to_timedelta(df["start"], errors='coerce')
+    df["end"] = pd.to_timedelta(df["end"], errors='coerce')
+    df["duration"] = pd.to_timedelta(df["duration"], errors='coerce')
     df.to_excel("history_files_summary.xlsx", index=False, engine="openpyxl")
