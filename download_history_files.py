@@ -199,24 +199,29 @@ def rsync_files(host, app, username):
 
             filename = parts[1]
 
-            if flags.startswith(">fc"):
+            if flags.startswith(">f+"):
+
+                cmd.insert(-1, f"{user}@{host}:{remote_path}{filename}")
+
+                n_tries = 1
+                while True:
+                    res = subprocess.run(cmd, capture_output=True, text=True)
+
+                    if res.returncode == 0:
+                        print(f"{colored('[ NEW ]',  color="white", on_color="on_green", attrs=['bold'])} {host}/{app}/{username}/{filename} is new and will be downloaded")
+                        break
+                    else:
+                        print(f"{colored('[ERROR]', 'cyan', attrs=['bold'])} Try {n_tries}: rsync failed for {host}/{app}/{username}/{filename} (rc={res.returncode}): {res.stderr.strip()}")
+                        print("Retrying in 60 seconds...")
+                        sleep(60)
+                        if n_tries >= 10:
+                            print(f"{colored('[FATAL]', 'red', attrs=['bold'])} Try {n_tries}: rsync of {host}/{app}/{username}/{filename} failed after {n_tries} attempts; moving to next.\n")
+                            break
+                        n_tries += 1
+                
+            elif flags.startswith(">fc"):
 
                 max_n = max_index(filename, dest_dir)
-                # Look for files named 'stem.<n>' and 'stem.<n>.gz' in the same directory
-                # Matches 'name.<number>' or 'name.<number>.gz' (for compressed rotations)
-                ##_suffix_re = re.compile(r"\.(\d+)$")
-                #_suffix_re = re.compile(r"\.(?P<number>\d+)(?:\.gz)?$")
-                #
-                #for p in dest_dir.glob(f"{filename}*"):
-                #    m = _suffix_re.search(p.name)
-                #    if m :
-                #        try:
-                #            n = int(m.group("number"))
-                #            if n > max_n:
-                #                max_n = n
-                #        except ValueError:
-                #            pass
-
                 if max_n != 0: # there exists at least one local backup
                     print(f"  Existing backups found up to {filename}.{max_n} in {dest_dir}")
                     
