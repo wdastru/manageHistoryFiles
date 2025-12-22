@@ -34,12 +34,6 @@ end_pattern = re.compile(
     r".*$"
 )
 
-object_pattern = re.compile(
-    r"^(.*?client changed object to.*?)?"
-    r"(?P<object>\"(?!\/Undefined.*?).*?\")"
-    r".*$"
-)
-
 end_duration_pattern = re.compile(
     r"^(?:\d{4}-\d{2}-\d{2}\s+)?"                # optional date
     r"(?P<end>\d{1,2}:\d{2}:\d{2})"
