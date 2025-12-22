@@ -256,9 +256,6 @@ def rsync_files(host, app, username):
 
     rsync_count += 1
 
-    run_containment(dest_dir)
-    fill_gaps(dest_dir)
-
 def is_host_reachable(host: str) -> bool:
     try:
         # For Linux/WSL: use '-c 1' for one packet
@@ -355,9 +352,16 @@ for remote in REMOTES_DATA:
         print(f"\n    *** Processing {app}... ***\n")
 
         for username in usernames:
-            
+            dest_dir = Path(f"./{host}/{app}/{username}/.")
             rsync_files(
                 host=host,
                 app=app,
                 username=username,
                 )
+            run_containment(dest_dir)
+            fill_gaps(dest_dir)
+            
+
+            
+            
+            
