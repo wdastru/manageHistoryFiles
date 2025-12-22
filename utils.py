@@ -39,6 +39,9 @@ def find_history_files(start_dir="."):
 
     return matches
 
+def is_equal(smaller, bigger):
+    return smaller == bigger
+
 def is_contained(smaller, bigger):
     return smaller in bigger
 
@@ -85,6 +88,11 @@ def fill_gaps(dir_path: str|Path):
     rename_files_sequentially(history_files, str(dir_path / "history"))
     rename_files_sequentially(history_files_old, str(dir_path / "history.old"))
 
+def is_old(filename: str) -> bool:
+    if "old" in filename:
+        return True
+    return False
+
 def run_containment(dir_path: str|Path):
     
     if not isinstance(dir_path, Path):
@@ -92,6 +100,7 @@ def run_containment(dir_path: str|Path):
 
     files_with_sizes = [(p, p.stat().st_size) for p in dir_path.glob("*") if p.is_file()]
     # Sort by size (descending)
+    files_sorted = sorted(files_with_sizes, key=lambda x: x[0], reverse=True)
     files_sorted = sorted(files_with_sizes, key=lambda x: x[1], reverse=True)
     to_be_deleted = set()
 
@@ -102,7 +111,18 @@ def run_containment(dir_path: str|Path):
             with open(dir_path / small_file[0].name, "rb") as f1, open(dir_path / big_file[0].name, "rb") as f2:
                 small = f1.read()
                 big = f2.read()
-                if is_contained(small, big):
+                if is_equal(small, big):
+                    if is_old(big_file[0].name): 
+                        
+                        print(f"{colored(small_file[0].name, 'red', attrs=['bold'])} will be deleted (equal to {colored(big_file[0].name, 'green', attrs=['bold'])})")
+                        to_be_deleted.add(dir_path / small_file[0].name)
+
+                    else: 
+
+                        print(f"{colored(big_file[0].name, 'red', attrs=['bold'])} will be deleted (equal to {colored(small_file[0].name, 'green', attrs=['bold'])})")
+                        to_be_deleted.add(dir_path / big_file[0].name)
+
+                elif is_contained(small, big):
                     print(f"{colored(small_file[0].name, 'red', attrs=['bold'])} will be deleted (contained in {colored(big_file[0].name, 'green', attrs=['bold'])})")
                     to_be_deleted.add(dir_path / small_file[0].name)
                     
