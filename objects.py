@@ -51,14 +51,26 @@ if __name__ == "__main__":
                         date: str = match_dto.group("date") if match_dto.group("date") else date
                         time: str = match_dto.group("time")
                         object: str = match_dto.group("object")
-                        print(f"{date} {time} {host} {app} {user} {object}")
+                        userdir: str|None = None
+
+                        in_object_pattern = re.compile(
+                            rf"^\"\/opt\/(?:.*?\/)?(?:.*?data\/)?(?P<userdir>.*?)\/(?:data\/)?.*$"
+                        )
+
+                        in_object_match = in_object_pattern.search(object)
+                        if in_object_match:
+                            userdir= in_object_match.group("userdir")
+
+                        print(f"{date} {time} {host} {app} {user} {userdir} {object}")
                         # append a structured record
                         records.append({
-                            "date": date,   # ideally a datetime.date / str in ISO format
-                            "time": time,             # ideally a datetime / time / str in ISO
+                            "date": date,
+                            "time": time,
                             "host": host,
                             "app": app,
+                            "file": file,
                             "user": user,
+                            "userdir": userdir,
                             "object": object,
                         })
     
