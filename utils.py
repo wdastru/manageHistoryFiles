@@ -97,13 +97,13 @@ def run_containment(dir_path: str|Path):
 
     for big_file in files_sorted:
         for small_file in reversed(files_sorted):
-            if big_file[1] <= small_file[1]:
-                continue  # only compare smaller files to bigger ones
+            if small_file is big_file:
+                break #stop when reachin the same file
             with open(dir_path / small_file[0].name, "rb") as f1, open(dir_path / big_file[0].name, "rb") as f2:
                 small = f1.read()
                 big = f2.read()
                 if is_contained(small, big):
-                    print(f"{dir_path}/{small_file[0].name} will be deleted (contained in {big_file[0].name})")
+                    print(f"{colored(small_file[0].name, 'red', attrs=['bold'])} will be deleted (contained in {colored(big_file[0].name, 'green', attrs=['bold'])})")
                     to_be_deleted.add(dir_path / small_file[0].name)
                     
     for file_path in to_be_deleted:
