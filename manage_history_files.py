@@ -210,6 +210,8 @@ if __name__ == "__main__":
     df["end"] = pd.to_timedelta(df["end"], errors='coerce')
     df["duration"] = pd.to_timedelta(df["duration"], errors='coerce')
 
+    df = df.sort_values(by=["date_start", "start"], ascending=[False, False], na_position="last")
+
     with pd.ExcelWriter("history_files_summary.xlsx", engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="History")
         ws = writer.sheets["History"]
@@ -229,3 +231,5 @@ if __name__ == "__main__":
                 (col_cells,) = ws.iter_cols(min_col=col_idx, max_col=col_idx)
                 for cell in col_cells:
                     cell.number_format = fmt
+        
+

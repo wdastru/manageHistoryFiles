@@ -78,7 +78,9 @@ if __name__ == "__main__":
     df = pd.DataFrame(records)
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df["time"] = pd.to_timedelta(df["time"], errors='coerce')
-    
+
+    df = df.sort_values(by=["date", "time"], ascending=[False, False], na_position="last")
+
     with pd.ExcelWriter("objects_summary.xlsx", engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Objects")
         ws = writer.sheets["Objects"]
