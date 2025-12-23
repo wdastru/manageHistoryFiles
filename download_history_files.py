@@ -338,10 +338,10 @@ for remote in REMOTES_DATA:
     host = remote["host"]
 
     if not is_host_reachable(remote["ip"]):
-        print(f"\n### Host {host} is not reachable...")
+        print(f"\n{colored('### Host ' + host + ' is not reachable...', 'red', attrs=['bold'])}")
         continue
     else:
-        print(f"\n### Processing {host}...")
+        print(f"\n{colored('### Processing ' + host + ' ...', 'green', attrs=['bold'])}")
 
     user = remote["user"]
     apps = remote["apps"]
