@@ -4,9 +4,10 @@ import datetime
 from datetime import timedelta, datetime
 import pandas as pd
 from utils import find_history_files
+from pathlib import Path
 
 # Matches .../<host>/<app>/<user>/history or history.old at the END of the path
-host_app_user_pattern = re.compile(
+host_app_user_pattern_local = re.compile(
         r"^\.[/\\](?P<host>[^/\\]+?)"       # host segment
         r"[\\/]"
         r"(?P<app>[^/\\]+?)"        # app segment
@@ -15,6 +16,15 @@ host_app_user_pattern = re.compile(
         r"[\\/]"                   
         r"(?P<file>[^/\\]+$)"       # file segment
     )
+
+host_app_user_pattern_syncthing = re.compile(
+    r"^\/mnt\/j\/"
+    r"(?P<host>.+)_history-files\/"
+    r"((?P<host_600>.+)_opt\/)?"    # optional match for AV600 paths
+    r"(?P<app>.+?)\/prog\/curdir\/"
+    r"(?P<user>.+)\/"
+    r"(?P<file>.*)$"
+)
 
 date_time_start_pattern = re.compile(
     r"^(?P<date>\d{4}-\d{2}-\d{2})"
@@ -41,7 +51,6 @@ end_duration_pattern = re.compile(
     r"(?:\safter\s((?P<duration_h>\d{1,2}:\d{2}:\d{2})(?:.*)?|(?P<duration_s>\d{2}\.\d{3})\ss))?$",
     re.IGNORECASE
 )
-
 def calculate_duration(lines: list, date_start:str, start: str, end: str) -> list[str|None]:
     new_date:str|None = None
     for line in reversed(lines):
@@ -143,11 +152,39 @@ def normalize_time(value: str) -> str:
 
 if __name__ == "__main__":
     records = []  # collect rows here
-    results = find_history_files(".")
+    results = []  # collect files paths here
+
+    local: bool = True 
+    while True:
+        choice = input("Enter local (L/l) or syncthing (S/s): ").strip()
+        if choice in ("L", "l", "S", "s"):
+            break
+        else:
+            print("Invalid input. Please enter a valid choice.")
+
+    if choice in ("L", "l"):
+        local = True
+        print(f"You selected: local data")
+        results = find_history_files(".")
+    else:
+        local = False
+        print(f"You selected: syncthing data")
+        base = Path("/mnt/j")
+        matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
+        matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
+        for m in matches:
+            results.extend(find_history_files(str(m.absolute())))
+    
     for path in results:
-        match = host_app_user_pattern.search(path)
+        if local:
+            match = host_app_user_pattern_local.search(path)
+        else:
+            match = host_app_user_pattern_syncthing.search(path)
+
         if match:
             host: str|None = match.group("host")
+            if match.groupdict().get("host_600") is not None:
+                host_600: str|None = match.group("host_600")
             app: str|None = match.group("app")
             user: str|None = match.group("user")
             file: str|None = match.group("file")
