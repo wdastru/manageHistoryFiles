@@ -250,6 +250,8 @@ if __name__ == "__main__":
                         else:
                             # riga di continuazione
                             buffer += line + "\n"
+
+    print(f"Total records collected: {len(records)}")
     
     # export to Excel
     df = pd.DataFrame(records)
