@@ -249,7 +249,12 @@ if __name__ == "__main__":
 
     df = df.sort_values(by=["date_start", "start"], ascending=[False, False], na_position="last")
 
-    with pd.ExcelWriter("history_files_summary.xlsx", engine="openpyxl") as writer:
+    if local:
+        output_file = "history_files_summary_local.xlsx"
+    else:
+        output_file = "history_files_summary_syncthing.xlsx"
+
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="History")
         ws = writer.sheets["History"]
 
