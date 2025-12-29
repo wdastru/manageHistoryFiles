@@ -6,6 +6,17 @@ import pandas as pd
 from utils import find_history_files
 from pathlib import Path
 
+NAME_MAP = {
+    # canonical names used in final columns
+    "PharmaScan": "PharmaScan",
+    "PHARMASCAN": "PharmaScan",
+    "AV600": "AV600",
+    "AV600-nmrsu": "AV600",
+    "AvanceNeo400": "AvanceNeo400",
+    "AVNeo400": "AvanceNeo400",
+    "AV300": "AV300",
+}
+
 # Matches .../<host>/<app>/<user>/history or history.old at the END of the path
 host_app_user_pattern_local = re.compile(
         r"^\.[/\\](?P<host>[^/\\]+?)"       # host segment
@@ -184,7 +195,8 @@ if __name__ == "__main__":
         if match:
             host: str|None = match.group("host")
             if match.groupdict().get("host_600") is not None:
-                host_600: str|None = match.group("host_600")
+                host: str|None = match.group("host_600")
+            host = NAME_MAP.get(host)
             app: str|None = match.group("app")
             user: str|None = match.group("user")
             file: str|None = match.group("file")
@@ -255,6 +267,7 @@ if __name__ == "__main__":
         output_file = "history_files_summary_syncthing.xlsx"
 
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        df = df.drop_duplicates()
         df.to_excel(writer, index=False, sheet_name="History")
         ws = writer.sheets["History"]
 
