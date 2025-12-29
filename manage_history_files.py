@@ -185,10 +185,18 @@ if __name__ == "__main__":
         matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
         matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
         matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
+
         for m in matches:
             results.extend(find_history_files(str(m.absolute())))
+
+        # TODO: run containment if stversions are present
+        for path in results:
+            if ".stversions" in path:
+                print(f"Found .stversions path: {Path(path).parent}")
+                print(f"Found .stversions path: {Path(path.replace('.stversions/', '')).parent}")
     
     for path in results:
+
         if local:
             match = host_app_user_pattern_local.search(path)
         else:
