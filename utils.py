@@ -30,11 +30,21 @@ def find_history_files(start_dir="."):
         target_names.add(f"history.{n}")
         target_names.add(f"history.old.{n}")
 
+    # Regex for timestamped variants:
+    #   history~20251229-131900
+    #   history~20251229-131900.old
+    # Pattern details:
+    #   - YYYYMMDD: 8 digits
+    #   - '-'
+    #   - HHMMSS: 6 digits (24h)
+    #   - optional '.old'
+    ts_pattern = re.compile(r"^history~\d{8}-\d{6}(?:\.old)?$")
+
     matches = []
 
     for root, dirs, files in os.walk(start_dir):
         for fname in files:
-            if fname in target_names:
+            if fname in target_names or ts_pattern.fullmatch(fname):
                 matches.append(os.path.join(root, fname))
 
     return matches

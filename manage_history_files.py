@@ -3,7 +3,7 @@ import re
 import datetime
 from datetime import timedelta, datetime
 import pandas as pd
-from utils import find_history_files
+from utils import find_history_files, run_containment
 from pathlib import Path
 
 NAME_MAP = {
@@ -31,7 +31,8 @@ host_app_user_pattern_local = re.compile(
 host_app_user_pattern_syncthing = re.compile(
     r"^\/mnt\/j\/"
     r"(?P<host>.+)_history-files\/"
-    r"((?P<host_600>.+)_opt\/)?"    # optional match for AV600 paths
+    r"((?P<stversions>\.stversions)\/)?"    # optional .stversions folder
+    r"((?P<host_600>.+)_opt\/)?"            # optional match for AV600 paths
     r"(?P<app>.+?)\/prog\/curdir\/"
     r"(?P<user>.+)\/"
     r"(?P<file>.*)$"
@@ -183,6 +184,7 @@ if __name__ == "__main__":
         base = Path("/mnt/j")
         matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
         matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
+        matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
         for m in matches:
             results.extend(find_history_files(str(m.absolute())))
     
@@ -194,8 +196,11 @@ if __name__ == "__main__":
 
         if match:
             host: str|None = match.group("host")
+            stversions: str|None = None
             if match.groupdict().get("host_600") is not None:
-                host: str|None = match.group("host_600")
+                host = match.group("host_600")
+            if match.groupdict().get("stversions") is not None:
+                stversions = match.group("stversions")
             host = NAME_MAP.get(host)
             app: str|None = match.group("app")
             user: str|None = match.group("user")
