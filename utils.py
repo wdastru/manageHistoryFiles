@@ -103,17 +103,13 @@ def is_old(filename: str) -> bool:
         return True
     return False
 
-def run_containment(dir1_path: str|Path, dir2_path: str|Path|None = None) -> bool:
+def run_containment(files_list: list[Path]) -> bool:
     
-    if not isinstance(dir1_path, Path):
-        dir1_path = Path(dir1_path)
-
-    if not isinstance(dir2_path, Path) and dir2_path is not None:
-        dir2_path = Path(dir2_path)
-
     keep_containing = True
     while keep_containing:
-        files_with_sizes = [(p, p.stat().st_size) for p in dir1_path.glob("*") if p.is_file()]
+
+        files_with_sizes: list[tuple[Path, int]] = [(p, p.stat().st_size) for p in files_list if p.is_file()]
+
         # Sort by size (descending)
         files_sorted = sorted(files_with_sizes, key=lambda x: x[0], reverse=True)
         files_sorted = sorted(files_with_sizes, key=lambda x: x[1], reverse=True)
@@ -123,26 +119,26 @@ def run_containment(dir1_path: str|Path, dir2_path: str|Path|None = None) -> boo
             for small_file in reversed(files_sorted):
                 if small_file is big_file:
                     break #stop when reaching the same file
-                with open(dir1_path / small_file[0].name, "rb") as f1, open(dir1_path / big_file[0].name, "rb") as f2:
+                with open(small_file[0], "rb") as f1, open(big_file[0], "rb") as f2:
                     small = f1.read()
                     big = f2.read()
                     if is_equal(small, big):
                         if is_old(big_file[0].name): 
                             
                             print(f"{colored(small_file[0].name, 'red', attrs=['bold'])} will be deleted (equal to {colored(big_file[0].name, 'green', attrs=['bold'])})")
-                            to_be_deleted.add(dir1_path / small_file[0].name)
+                            to_be_deleted.add(small_file)
 
                         else: 
 
                             print(f"{colored(big_file[0].name, 'red', attrs=['bold'])} will be deleted (equal to {colored(small_file[0].name, 'green', attrs=['bold'])})")
-                            to_be_deleted.add(dir1_path / big_file[0].name)
+                            to_be_deleted.add(big_file)
 
                     elif is_contained(small, big):
                         print(f"{colored(small_file[0].name, 'red', attrs=['bold'])} will be deleted (contained in {colored(big_file[0].name, 'green', attrs=['bold'])})")
-                        to_be_deleted.add(dir1_path / small_file[0].name)
+                        to_be_deleted.add(small_file)
                         
         if not to_be_deleted:
             keep_containing = False
         else:
             for file_path in to_be_deleted:
-                    file_path.unlink()
+                    file_path[0].unlink()

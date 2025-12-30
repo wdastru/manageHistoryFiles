@@ -358,7 +358,8 @@ for remote in REMOTES_DATA:
                 app=app,
                 username=username,
                 )
-            run_containment(dest_dir)
+            files: list[Path] = [p for p in dest_dir.glob("*") if p.is_file()]
+            run_containment(files_list=files)
             fill_gaps(dest_dir)
             
 
