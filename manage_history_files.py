@@ -3,7 +3,7 @@ import re
 import datetime
 from datetime import timedelta, datetime
 import pandas as pd
-from utils import find_history_files, run_containment
+from utils import find_history_files, run_containment, fill_gaps
 from pathlib import Path
 
 NAME_MAP = {
@@ -189,12 +189,26 @@ if __name__ == "__main__":
         for m in matches:
             results.extend(find_history_files(str(m.absolute())))
 
-        # TODO: run containment if stversions are present
+        # Run containment if stversions are present
+        to_be_contained: list[list[Path]] = []
         for path in results:
-            if ".stversions" in path:
-                print(f"Found .stversions path: {Path(path).parent}")
-                print(f"Found .stversions path: {Path(path.replace('.stversions/', '')).parent}")
-    
+            if ".stversions/" in path:
+                sublist: list[Path] = []
+                before, sep, after = path.partition(".stversions/")
+                after, sep, filename = after.partition("history")
+                for item in results:
+                    if before in item and after in item:
+                        sublist.append(Path(item))
+
+                sublist = sorted(sublist)
+                if sublist not in to_be_contained:
+                    to_be_contained.append(sublist)
+
+        # Run containment on the reduced lists
+        for item in to_be_contained:
+            run_containment(files_list=item)
+            fill_gaps(files_list=item)
+
     for path in results:
 
         if local:
