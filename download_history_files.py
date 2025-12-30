@@ -359,7 +359,7 @@ for remote in REMOTES_DATA:
                 username=username,
                 )
             files: list[Path] = [p for p in dest_dir.glob("*") if p.is_file()]
-            run_containment(files_list=files)
-            if files is not None and len(files) > 0:
+            if len(files) > 1:
+                run_containment(files_list=files)
                 fill_gaps(files_list=files)
             
