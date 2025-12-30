@@ -55,48 +55,51 @@ def is_equal(smaller, bigger):
 def is_contained(smaller, bigger):
     return smaller in bigger
 
-def rename_files_sequentially(file_list, prefix):
+def rename_files_sequentially(file_list: list[Path]) -> None:
     """
     Rinomina i file della lista in modo che gli indici siano consecutivi.
     Il file base (senza suffisso) NON viene rinominato.
     """
     # Estrai indici dai file con suffisso numerico
     indices = []
+    prefixes: list[str] = []
     for f in file_list:
-        m = re.match(rf"{prefix}\.(\d+)$", f)
+        m = re.match(rf"(?P<prefix>.+(old)?)\.(?P<number>\d+)$", str(f))
         if m:
-            indices.append(int(m.group(1)))
-
-    # Ordina gli indici
-    indices.sort()
-
+            indices.append(int(m.group("number")))
+            prefixes.append(m.group("prefix"))
+    
+    # Controlla che tutti i prefissi siano uguali
+    if len(prefixes) > 1:
+        if any(p != prefixes[0] for p in prefixes):
+            print(f"{colored('Error:', 'red', attrs=['bold'])} File list contains different prefixes, cannot rename sequentially.")
+        else: # Ordina gli indici
+            indices.sort()
+    
     # Rinomina sequenzialmente partendo da 1
     for new_idx, old_idx in enumerate(indices, start=1):
-        old_name = f"{prefix}.{old_idx}"
-        new_name = f"{prefix}.{new_idx}"
+        old_name = f"{prefixes[0]}.{old_idx}"
+        new_name = f"{prefixes[0]}.{new_idx}"
         if old_name != new_name:
             if not os.path.exists(new_name):
                 print(f"Renaming {colored(old_name, 'red', attrs=['bold'])} to {colored(new_name, 'green', attrs=['bold'])}")
                 os.rename(old_name, new_name)
 
-def fill_gaps(dir_path: str|Path):
+def fill_gaps(files_list: list[Path]) -> None:
 
-    if not isinstance(dir_path, Path):
-        dir_path = Path(dir_path)
-
-    history_files = find_history_files(dir_path)
-    history_files_old = []
+    history_files: list[Path] = files_list
+    history_files_old: list[Path] = []
     to_be_removed = set()
     for file_path in history_files:
-        if "history.old" in file_path:
+        if "history.old" in str(file_path):
             history_files_old.append(file_path)
             to_be_removed.add(file_path)
 
     for file_path in to_be_removed:
         history_files.remove(file_path)
 
-    rename_files_sequentially(history_files, str(dir_path / "history"))
-    rename_files_sequentially(history_files_old, str(dir_path / "history.old"))
+    rename_files_sequentially(history_files)
+    rename_files_sequentially(history_files_old)
 
 def is_old(filename: str) -> bool:
     if "old" in filename:
