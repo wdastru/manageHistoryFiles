@@ -60,14 +60,44 @@ def rename_files_sequentially(file_list: list[Path]) -> None:
     Rinomina i file della lista in modo che gli indici siano consecutivi.
     Il file base (senza suffisso) NON viene rinominato.
     """
+
+    print(f"{colored("Renaming files sequentially actually out of order.", 'red', attrs=['bold'])}")
+    return
+
     # Estrai indici dai file con suffisso numerico
     indices = []
     prefixes: list[str] = []
+    file_list.sort()
+    max_index: int = 0
+
     for f in file_list:
-        m = re.match(rf"(?P<prefix>.+(old)?)\.(?P<number>\d+)$", str(f))
+
+        # TODO: gestire i file .old derivanti dal .stversions/
+        pattern = r"^(?P<prefix>.+history)" \
+                  r"(?P<timestamp>~[0-9]+-[0-9]+)?" \
+                  r"(?P<old>\.old)?" \
+                  r"(\.)?" \
+                  r"(?P<number>[0-9]+)?$"
+        m: re.Match[str] | None = re.match(pattern, str(f))
         if m:
-            indices.append(int(m.group("number")))
-            prefixes.append(m.group("prefix"))
+            if m.group("prefix"):
+                if m.group("old"):
+                    prefixes.append(m.group("prefix") + m.group("old"))
+                else:
+                    prefixes.append(m.group("prefix"))
+
+                if not m.group("timestamp") and not m.group("number"):
+                    # history or history.old file
+                    indices.append(0)
+                    continue
+                
+                if m.group("number"):
+                    indices.append(int(m.group("number")))
+                    max_index = int(m.group("number"))
+                
+                if m.group("timestamp"):
+                    max_index += 1
+                    indices.append(max_index)
     
     # Controlla che tutti i prefissi siano uguali
     if len(prefixes) > 1:
@@ -77,13 +107,23 @@ def rename_files_sequentially(file_list: list[Path]) -> None:
             indices.sort()
     
     # Rinomina sequenzialmente partendo da 1
-    for new_idx, old_idx in enumerate(indices, start=1):
+    for new_idx, old_idx in enumerate(indices, start=0):
         old_name = f"{prefixes[0]}.{old_idx}"
         new_name = f"{prefixes[0]}.{new_idx}"
         if old_name != new_name:
             if not os.path.exists(new_name):
                 print(f"Renaming {colored(old_name, 'red', attrs=['bold'])} to {colored(new_name, 'green', attrs=['bold'])}")
-                os.rename(old_name, new_name)
+                
+                while True:
+                    choice = input("Rename the file or not ([yY]/[nN]]): ").strip()
+                    if choice in ("y", "Y"):
+                        os.rename(old_name, new_name)
+                        break
+                    elif choice in ("n", "N"):
+                        break
+                    else:
+                        print("Invalid input. Please enter a valid choice.")
+                
 
 def fill_gaps(files_list: list[Path]) -> None:
 
@@ -91,9 +131,12 @@ def fill_gaps(files_list: list[Path]) -> None:
     history_files_old: list[Path] = []
     to_be_removed = set()
     for file_path in history_files:
-        if "history.old" in str(file_path):
-            history_files_old.append(file_path)
-            to_be_removed.add(file_path)
+
+        m = re.match(rf"^.+history(?P<timestamp>~.+?)?(?P<old>\.old)?(\.[0-9]+)?$", str(file_path))
+        if m:
+            if m.group("old"):
+                history_files_old.append(file_path)
+                to_be_removed.add(file_path)
 
     for file_path in to_be_removed:
         history_files.remove(file_path)
@@ -101,10 +144,14 @@ def fill_gaps(files_list: list[Path]) -> None:
     rename_files_sequentially(history_files)
     rename_files_sequentially(history_files_old)
 
-def is_old(filename: str) -> bool:
-    if "old" in filename:
-        return True
-    return False
+def is_old(file: Path) -> bool:
+    if file.exists():
+        if file.suffix == ".old":
+            return True
+        return False
+    else:
+        print(f"Warning: file {file} does not exists!")
+        exit(1)
 
 def run_containment(files_list: list[Path]) -> bool:
     
@@ -115,7 +162,7 @@ def run_containment(files_list: list[Path]) -> bool:
 
         # Sort by size (descending)
         files_sorted = sorted(files_with_sizes, key=lambda x: x[0], reverse=True)
-        files_sorted = sorted(files_with_sizes, key=lambda x: x[1], reverse=True)
+        files_sorted = sorted(files_sorted, key=lambda x: x[1], reverse=True)
         to_be_deleted = set()
 
         for big_file in files_sorted:
@@ -126,13 +173,21 @@ def run_containment(files_list: list[Path]) -> bool:
                     small = f1.read()
                     big = f2.read()
                     if is_equal(small, big):
-                        if is_old(big_file[0].name): 
-                            
+                        if is_old(big_file[0]): 
+                            # big_file is a .old file. 
+                            # It could be:
+                            # history.old or
+                            # history~YYYYMMDD-hhmmss.old file copied from .stversions/
+                            # It will be kept, and small file deleted
                             print(f"{colored(small_file[0].name, 'red', attrs=['bold'])} will be deleted (equal to {colored(big_file[0].name, 'green', attrs=['bold'])})")
                             to_be_deleted.add(small_file)
-
                         else: 
-
+                            # big_file is not a .old file. 
+                            # It could be: 
+                            # history or 
+                            # history.n or 
+                            # history.old.n or 
+                            # history~YYYYMMDD-hhmmss file copied from .stversions/
                             print(f"{colored(big_file[0].name, 'red', attrs=['bold'])} will be deleted (equal to {colored(small_file[0].name, 'green', attrs=['bold'])})")
                             to_be_deleted.add(big_file)
 
@@ -143,5 +198,15 @@ def run_containment(files_list: list[Path]) -> bool:
         if not to_be_deleted:
             keep_containing = False
         else:
-            for file_path in to_be_deleted:
-                    file_path[0].unlink()
+            for file_tuple in to_be_deleted:
+                #while True:
+                #    choice = input("Delete file or not ([yY]/[nN]]): ").strip()
+                #    if choice in ("y", "Y"):
+                        file_tuple[0].unlink()
+                        files_list.remove(file_tuple[0])
+                #        break
+                #    elif choice in ("n", "N"):
+                #        keep_containing = False
+                #        break
+                #    else:
+                #        print("Invalid input. Please enter a valid choice.")
