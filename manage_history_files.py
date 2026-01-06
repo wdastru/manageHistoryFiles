@@ -3,7 +3,7 @@ import re
 import datetime
 from datetime import timedelta, datetime
 import pandas as pd
-from utils import find_history_files, run_containment, fill_gaps
+from utils import find_history_files, run_containment#, fill_gaps
 from pathlib import Path
 import shutil
 
@@ -226,7 +226,16 @@ if __name__ == "__main__":
             item: list[Path] = list(dict.fromkeys(item))
         
             run_containment(files_list=item)
-            fill_gaps(files_list=item)
+            #fill_gaps(files_list=item)
+    
+    results.clear()
+
+    base = Path("/mnt/j")
+    matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
+    matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
+    matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
+    for m in matches:
+        results.extend(find_history_files(str(m.absolute())))
 
     for path in results:
 
@@ -234,7 +243,7 @@ if __name__ == "__main__":
             match = host_app_user_pattern_local.search(path)
         else:
             match = host_app_user_pattern_syncthing.search(path)
-
+        
         if match:
             host: str|None = match.group("host")
             stversions: str|None = None

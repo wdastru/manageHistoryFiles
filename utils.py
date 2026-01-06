@@ -125,24 +125,24 @@ def rename_files_sequentially(file_list: list[Path]) -> None:
                         print("Invalid input. Please enter a valid choice.")
                 
 
-def fill_gaps(files_list: list[Path]) -> None:
-
-    history_files: list[Path] = files_list
-    history_files_old: list[Path] = []
-    to_be_removed = set()
-    for file_path in history_files:
-
-        m = re.match(rf"^.+history(?P<timestamp>~.+?)?(?P<old>\.old)?(\.[0-9]+)?$", str(file_path))
-        if m:
-            if m.group("old"):
-                history_files_old.append(file_path)
-                to_be_removed.add(file_path)
-
-    for file_path in to_be_removed:
-        history_files.remove(file_path)
-
-    rename_files_sequentially(history_files)
-    rename_files_sequentially(history_files_old)
+#def fill_gaps(files_list: list[Path]) -> None:
+#
+#    history_files: list[Path] = files_list
+#    history_files_old: list[Path] = []
+#    to_be_removed = set()
+#    for file_path in history_files:
+#
+#        m = re.match(rf"^.+history(?P<timestamp>~.+?)?(?P<old>\.old)?(\.[0-9]+)?$", str(file_path))
+#        if m:
+#            if m.group("old"):
+#                history_files_old.append(file_path)
+#                to_be_removed.add(file_path)
+#
+#    for file_path in to_be_removed:
+#        history_files.remove(file_path)
+#
+#    rename_files_sequentially(history_files)
+#    rename_files_sequentially(history_files_old)
 
 def is_old(file: Path) -> bool:
     if file.exists():
@@ -199,14 +199,5 @@ def run_containment(files_list: list[Path]) -> bool:
             keep_containing = False
         else:
             for file_tuple in to_be_deleted:
-                #while True:
-                #    choice = input("Delete file or not ([yY]/[nN]]): ").strip()
-                #    if choice in ("y", "Y"):
-                        file_tuple[0].unlink()
-                        files_list.remove(file_tuple[0])
-                #        break
-                #    elif choice in ("n", "N"):
-                #        keep_containing = False
-                #        break
-                #    else:
-                #        print("Invalid input. Please enter a valid choice.")
+                file_tuple[0].unlink()
+                files_list.remove(file_tuple[0])
