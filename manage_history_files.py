@@ -5,6 +5,7 @@ from datetime import timedelta, datetime
 import pandas as pd
 from utils import find_history_files, run_containment, fill_gaps
 from pathlib import Path
+import shutil
 
 NAME_MAP = {
     # canonical names used in final columns
@@ -168,6 +169,7 @@ if __name__ == "__main__":
 
     local: bool = True 
     while True:
+
         choice = input("Enter local (L/l) or syncthing (S/s): ").strip()
         if choice in ("L", "l", "S", "s"):
             break
@@ -204,8 +206,25 @@ if __name__ == "__main__":
                 if sublist not in to_be_contained:
                     to_be_contained.append(sublist)
 
-        # Run containment on the reduced lists
+        # Move .stversions/ files to main history directory
         for item in to_be_contained:
+            for i, file in enumerate(item):
+                if ".stversions/" in str(file):
+                    source: Path = file
+                    before, sep, after = str(file).partition(".stversions/")
+                    destination: Path = Path(f"{before}{after}")
+                    item[i] = destination
+                    print(f"!!! Copying {source.name} to {destination.parent}/")
+                    
+                    # Check if destination exists
+                    if not destination.exists():
+                        shutil.copy2(source, destination)
+                    else:
+                        print(f"File already exists: {destination}")
+            
+            # removes duplicates, preserving order, by converting to dict (keys are unique) and back to list
+            item: list[Path] = list(dict.fromkeys(item))
+        
             run_containment(files_list=item)
             fill_gaps(files_list=item)
 
