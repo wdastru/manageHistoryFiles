@@ -41,7 +41,8 @@ if __name__ == "__main__":
     results = []  # collect files paths here
 
     base = Path("/mnt/j")
-    matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
+    matches: list[Path] = []
+    #matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
     matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
 
     for m in matches:

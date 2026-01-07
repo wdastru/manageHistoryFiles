@@ -165,84 +165,64 @@ def normalize_time(value: str) -> str:
 
 if __name__ == "__main__":
     records = []  # collect rows here
-    records_counter = 1
     results = []  # collect files paths here
+    matches: list[Path] = []
+    records_counter = 1
+    base = Path("/mnt/j")
 
-    local: bool = True 
-    while True:
+    matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
+    matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
 
-        choice = input("Enter local (L/l) or syncthing (S/s): ").strip()
-        if choice in ("L", "l", "S", "s"):
-            break
-        else:
-            print("Invalid input. Please enter a valid choice.")
+    for m in matches:
+        results.extend(find_history_files(str(m.absolute())))
 
-    if choice in ("L", "l"):
-        local = True
-        print(f"You selected: local data")
-        results = find_history_files(".")
-    else:
-        local = False
-        print(f"You selected: syncthing data")
-        base = Path("/mnt/j")
-        matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
-        matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
-        matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
+    # Run containment if stversions are present
+    to_be_contained: list[list[Path]] = []
+    for path in results:
+        if ".stversions/" in path:
+            sublist: list[Path] = []
+            before, sep, after = path.partition(".stversions/")
+            after, sep, filename = after.partition("history")
+            for item in results:
+                if before in item and after in item:
+                    sublist.append(Path(item))
 
-        for m in matches:
-            results.extend(find_history_files(str(m.absolute())))
+            sublist = sorted(sublist)
+            if sublist not in to_be_contained:
+                to_be_contained.append(sublist)
 
-        # Run containment if stversions are present
-        to_be_contained: list[list[Path]] = []
-        for path in results:
-            if ".stversions/" in path:
-                sublist: list[Path] = []
-                before, sep, after = path.partition(".stversions/")
-                after, sep, filename = after.partition("history")
-                for item in results:
-                    if before in item and after in item:
-                        sublist.append(Path(item))
-
-                sublist = sorted(sublist)
-                if sublist not in to_be_contained:
-                    to_be_contained.append(sublist)
-
-        # Move .stversions/ files to main history directory
-        for item in to_be_contained:
-            for i, file in enumerate(item):
-                if ".stversions/" in str(file):
-                    source: Path = file
-                    before, sep, after = str(file).partition(".stversions/")
-                    destination: Path = Path(f"{before}{after}")
-                    item[i] = destination
-                    print(f"!!! Copying {source.name} to {destination.parent}/")
-                    
-                    # Check if destination exists
-                    if not destination.exists():
-                        shutil.copy2(source, destination)
-                    else:
-                        print(f"File already exists: {destination}")
-            
-            # removes duplicates, preserving order, by converting to dict (keys are unique) and back to list
-            item: list[Path] = list(dict.fromkeys(item))
+    # Move .stversions/ files to main history directory
+    for item in to_be_contained:
+        for i, file in enumerate(item):
+            if ".stversions/" in str(file):
+                source: Path = file
+                before, sep, after = str(file).partition(".stversions/")
+                destination: Path = Path(f"{before}{after}")
+                item[i] = destination
+                print(f"!!! Copying {source.name} to {destination.parent}/")
+                
+                # Check if destination exists
+                if not destination.exists():
+                    shutil.copy2(source, destination)
+                else:
+                    print(f"File already exists: {destination}")
         
-            run_containment(files_list=item)
-            #fill_gaps(files_list=item)
+        # removes duplicates, preserving order, by converting to dict (keys are unique) and back to list
+        item: list[Path] = list(dict.fromkeys(item))
+    
+        run_containment(files_list=item)
+        #fill_gaps(files_list=item)
     
     results.clear()
+    matches.clear()
 
-    base = Path("/mnt/j")
-    matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
     matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
     for m in matches:
         results.extend(find_history_files(str(m.absolute())))
 
     for file_counter, path in enumerate(results, start=1):
 
-        if local:
-            match = host_app_user_pattern_local.search(path)
-        else:
-            match = host_app_user_pattern_syncthing.search(path)
+        match = host_app_user_pattern_syncthing.search(path)
         
         if match:
             host: str|None = match.group("host")
@@ -321,10 +301,7 @@ if __name__ == "__main__":
 
     df = df.sort_values(by=["date_start", "start"], ascending=[False, False], na_position="last")
 
-    if local:
-        output_file = "history_files_summary_local.xlsx"
-    else:
-        output_file = "history_files_summary_syncthing.xlsx"
+    output_file = "history_files_summary.xlsx"
 
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         df = df.drop_duplicates()
