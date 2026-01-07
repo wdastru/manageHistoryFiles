@@ -165,6 +165,7 @@ def normalize_time(value: str) -> str:
 
 if __name__ == "__main__":
     records = []  # collect rows here
+    records_counter = 1
     results = []  # collect files paths here
 
     local: bool = True 
@@ -233,11 +234,10 @@ if __name__ == "__main__":
     base = Path("/mnt/j")
     matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
     matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
-    matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
     for m in matches:
         results.extend(find_history_files(str(m.absolute())))
 
-    for path in results:
+    for file_counter, path in enumerate(results, start=1):
 
         if local:
             match = host_app_user_pattern_local.search(path)
@@ -264,6 +264,8 @@ if __name__ == "__main__":
 
             buffer = ''
             with open(path, 'r', encoding='utf-8') as f:
+
+                print(f"[{file_counter}] Processing file: {path}")
                 lines = f.readlines()
                 buffer_number = 1
                 
@@ -275,13 +277,13 @@ if __name__ == "__main__":
                             # processa buffer precedente
                             if buffer:
                                 
-                                ### TODO: cosa fa questo check?
+                                # last line of the file
                                 if raw_line == lines[-1]:
                                     buffer += line + "\n"
                                 
                                 #print(f"Processing buffer {buffer_number}")
                                 date_start, date_end, start, end, duration = extract_data(buffer)
-                                print(f"Found {host}/{app}/{user} -> {file} ({date_start}, {start}, {date_end}, {end}, {duration})")
+                                print(f"[{records_counter}] Record found: {host}/{app}/{user} -> {file} ({date_start}, {start}, {date_end}, {end}, {duration})")
                                 
                                 # append a structured record
                                 records.append({
@@ -296,8 +298,8 @@ if __name__ == "__main__":
                                     "duration": duration        # seconds, HH:MM:SS, etc.
                                 })
 
+                                records_counter += 1
                                 buffer_number += 1
-
                                 buffer = line + "\n"   # start new buffer
                             else:
                                 # riga di continuazione
@@ -306,6 +308,7 @@ if __name__ == "__main__":
                             # riga di continuazione
                             buffer += line + "\n"
 
+    print(f"Total files found: {len(results)}")
     print(f"Total records collected: {len(records)}")
     
     # export to Excel

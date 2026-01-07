@@ -1,6 +1,7 @@
 import re
 from utils import find_history_files
 import pandas as pd
+from pathlib import Path
 
 object_pattern = re.compile(
     r"^((?P<date>\d{4}-\d{2}-\d{2})\s+)?"
@@ -20,6 +21,16 @@ host_app_user_pattern = re.compile(
     r"(?P<file>[^/\\]+$)"       # file segment
 )
 
+host_app_user_pattern_syncthing = re.compile(
+    r"^\/mnt\/j\/"
+    r"(?P<host>.+)_history-files\/"
+    r"((?P<stversions>\.stversions)\/)?"    # optional .stversions folder
+    r"((?P<host_600>.+)_opt\/)?"            # optional match for AV600 paths
+    r"(?P<app>.+?)\/prog\/curdir\/"
+    r"(?P<user>.+)\/"
+    r"(?P<file>.*)$"
+)
+
 date_pattern = re.compile(
     r"^(?P<date>\d{4}-\d{2}-\d{2})"
     r".*$"
@@ -27,9 +38,17 @@ date_pattern = re.compile(
 
 if __name__ == "__main__":
     records = []  # collect rows here
-    results = find_history_files(".")
+    results = []  # collect files paths here
+
+    base = Path("/mnt/j")
+    matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
+    matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
+
+    for m in matches:
+        results.extend(find_history_files(str(m.absolute())))
+
     for path in results:
-        match_hauf = host_app_user_pattern.search(path)
+        match_hauf = host_app_user_pattern_syncthing.search(path)
         if match_hauf:
             host: str|None = match_hauf.group("host")
             app: str|None = match_hauf.group("app")
