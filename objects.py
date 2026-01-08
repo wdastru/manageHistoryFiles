@@ -39,6 +39,7 @@ date_pattern = re.compile(
 if __name__ == "__main__":
     records = []  # collect rows here
     results = []  # collect files paths here
+    objects_counter = 1
 
     base = Path("/mnt/j")
     matches: list[Path] = []
@@ -81,7 +82,7 @@ if __name__ == "__main__":
                         if in_object_match:
                             userdir= in_object_match.group("userdir")
 
-                        print(f"{date} {time} {host} {app} {user} {userdir} {object}")
+                        print(f"[{objects_counter}] Object found: {date} {time} {host} {app} {user} {userdir} {object}")
                         # append a structured record
                         records.append({
                             "date": date,
@@ -93,6 +94,8 @@ if __name__ == "__main__":
                             "userdir": userdir,
                             "object": object,
                         })
+
+                        objects_counter += 1
     
     # export to Excel
     df = pd.DataFrame(records)
