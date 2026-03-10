@@ -172,7 +172,7 @@ if __name__ == "__main__":
 
     matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
     matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
-
+    
     for m in matches:
         results.extend(find_history_files(str(m.absolute())))
 
@@ -199,11 +199,11 @@ if __name__ == "__main__":
                 before, sep, after = str(file).partition(".stversions/")
                 destination: Path = Path(f"{before}{after}")
                 item[i] = destination
-                print(f"!!! Copying {source.name} to {destination.parent}/")
                 
                 # Check if destination exists
                 if not destination.exists():
                     shutil.copy2(source, destination)
+                    print(f"!!! {source.name} copied to {destination.parent}/")
                 else:
                     print(f"File already exists: {destination}")
         
