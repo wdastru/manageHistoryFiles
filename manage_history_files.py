@@ -163,7 +163,7 @@ def normalize_time(value: str) -> str:
     else:
         return value  # fallback
 
-if __name__ == "__main__":
+def main():
     records = []  # collect rows here
     results = []  # collect files paths here
     matches: list[Path] = []
@@ -323,5 +323,6 @@ if __name__ == "__main__":
                 (col_cells,) = ws.iter_cols(min_col=col_idx, max_col=col_idx)
                 for cell in col_cells:
                     cell.number_format = fmt
-        
 
+if __name__ == "__main__":
+    main()

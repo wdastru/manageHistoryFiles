@@ -7,7 +7,7 @@ object_pattern = re.compile(
     r"^((?P<date>\d{4}-\d{2}-\d{2})\s+)?"
     r"(?P<time>\d{2}:\d{2}:\d{2})"
     r".*?client changed object to.*?"
-    r"(?P<object>\"(?!\/Undefined.*?\/Undefined).*?\")"
+    r"(?P<object>\".*?\")"
     r".*$"
 )
 
@@ -36,14 +36,13 @@ date_pattern = re.compile(
     r".*$"
 )
 
-if __name__ == "__main__":
+def main():
     records = []  # collect rows here
     results = []  # collect files paths here
     objects_counter = 1
 
     base = Path("/mnt/j")
     matches: list[Path] = []
-    #matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
     matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
 
     for m in matches:
@@ -120,3 +119,6 @@ if __name__ == "__main__":
                 (col_cells,) = ws.iter_cols(min_col=col_idx, max_col=col_idx)
                 for cell in col_cells:
                     cell.number_format = fmt
+
+if __name__ == "__main__":
+    main()
