@@ -3,8 +3,9 @@ import re
 import datetime
 from datetime import timedelta, datetime
 import pandas as pd
-from utils import find_history_files, run_containment
+from utils import find_history_files, run_containment#, fill_gaps
 from pathlib import Path
+import shutil
 
 NAME_MAP = {
     # canonical names used in final columns
@@ -162,46 +163,67 @@ def normalize_time(value: str) -> str:
     else:
         return value  # fallback
 
-if __name__ == "__main__":
+def main():
     records = []  # collect rows here
     results = []  # collect files paths here
+    matches: list[Path] = []
+    records_counter = 1
+    base = Path("/mnt/j")
 
-    local: bool = True 
-    while True:
-        choice = input("Enter local (L/l) or syncthing (S/s): ").strip()
-        if choice in ("L", "l", "S", "s"):
-            break
-        else:
-            print("Invalid input. Please enter a valid choice.")
-
-    if choice in ("L", "l"):
-        local = True
-        print(f"You selected: local data")
-        results = find_history_files(".")
-    else:
-        local = False
-        print(f"You selected: syncthing data")
-        base = Path("/mnt/j")
-        matches: list[Path] = list(base.glob("AV300_history-files/AV600_opt/topspin/prog/curdir/*"))
-        matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
-        matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
-
-        for m in matches:
-            results.extend(find_history_files(str(m.absolute())))
-
-        # TODO: run containment if stversions are present
-        for path in results:
-            if ".stversions" in path:
-                print(f"Found .stversions path: {Path(path).parent}")
-                print(f"Found .stversions path: {Path(path.replace('.stversions/', '')).parent}")
+    matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
+    matches.extend(list(base.glob("*history*/.stversions/*/prog/curdir/*")))
     
+    for m in matches:
+        results.extend(find_history_files(str(m.absolute())))
+
+    # Run containment if stversions are present
+    to_be_contained: list[list[Path]] = []
     for path in results:
+        if ".stversions/" in path:
+            sublist: list[Path] = []
+            before, sep, after = path.partition(".stversions/")
+            after, sep, filename = after.partition("history")
+            for item in results:
+                if before in item and after in item:
+                    sublist.append(Path(item))
 
-        if local:
-            match = host_app_user_pattern_local.search(path)
-        else:
-            match = host_app_user_pattern_syncthing.search(path)
+            sublist = sorted(sublist)
+            if sublist not in to_be_contained:
+                to_be_contained.append(sublist)
 
+    # Move .stversions/ files to main history directory
+    for item in to_be_contained:
+        for i, file in enumerate(item):
+            if ".stversions/" in str(file):
+                source: Path = file
+                before, sep, after = str(file).partition(".stversions/")
+                destination: Path = Path(f"{before}{after}")
+                item[i] = destination
+                
+                # Check if destination exists
+                if not destination.exists():
+                    shutil.copy2(source, destination)
+                    print(f"!!! {source.name} copied to {destination.parent}/")
+                else:
+                    print(f"File already exists: {destination}")
+        
+        # removes duplicates, preserving order, by converting to dict (keys are unique) and back to list
+        item: list[Path] = list(dict.fromkeys(item))
+    
+        run_containment(files_list=item)
+        #fill_gaps(files_list=item)
+    
+    results.clear()
+    matches.clear()
+
+    matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
+    for m in matches:
+        results.extend(find_history_files(str(m.absolute())))
+
+    for file_counter, path in enumerate(results, start=1):
+
+        match = host_app_user_pattern_syncthing.search(path)
+        
         if match:
             host: str|None = match.group("host")
             stversions: str|None = None
@@ -222,6 +244,8 @@ if __name__ == "__main__":
 
             buffer = ''
             with open(path, 'r', encoding='utf-8') as f:
+
+                print(f"[{file_counter}] Processing file: {path}")
                 lines = f.readlines()
                 buffer_number = 1
                 
@@ -233,13 +257,13 @@ if __name__ == "__main__":
                             # processa buffer precedente
                             if buffer:
                                 
-                                ### TODO: cosa fa questo check?
+                                # last line of the file
                                 if raw_line == lines[-1]:
                                     buffer += line + "\n"
                                 
                                 #print(f"Processing buffer {buffer_number}")
                                 date_start, date_end, start, end, duration = extract_data(buffer)
-                                print(f"Found {host}/{app}/{user} -> {file} ({date_start}, {start}, {date_end}, {end}, {duration})")
+                                print(f"[{records_counter}] Record found: {host}/{app}/{user} -> {file} ({date_start}, {start}, {date_end}, {end}, {duration})")
                                 
                                 # append a structured record
                                 records.append({
@@ -254,8 +278,8 @@ if __name__ == "__main__":
                                     "duration": duration        # seconds, HH:MM:SS, etc.
                                 })
 
+                                records_counter += 1
                                 buffer_number += 1
-
                                 buffer = line + "\n"   # start new buffer
                             else:
                                 # riga di continuazione
@@ -264,6 +288,7 @@ if __name__ == "__main__":
                             # riga di continuazione
                             buffer += line + "\n"
 
+    print(f"Total files found: {len(results)}")
     print(f"Total records collected: {len(records)}")
     
     # export to Excel
@@ -276,10 +301,7 @@ if __name__ == "__main__":
 
     df = df.sort_values(by=["date_start", "start"], ascending=[False, False], na_position="last")
 
-    if local:
-        output_file = "history_files_summary_local.xlsx"
-    else:
-        output_file = "history_files_summary_syncthing.xlsx"
+    output_file = "history_files_summary.xlsx"
 
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         df = df.drop_duplicates()
@@ -301,5 +323,6 @@ if __name__ == "__main__":
                 (col_cells,) = ws.iter_cols(min_col=col_idx, max_col=col_idx)
                 for cell in col_cells:
                     cell.number_format = fmt
-        
 
+if __name__ == "__main__":
+    main()

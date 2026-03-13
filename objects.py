@@ -1,12 +1,13 @@
 import re
 from utils import find_history_files
 import pandas as pd
+from pathlib import Path
 
 object_pattern = re.compile(
     r"^((?P<date>\d{4}-\d{2}-\d{2})\s+)?"
     r"(?P<time>\d{2}:\d{2}:\d{2})"
     r".*?client changed object to.*?"
-    r"(?P<object>\"(?!\/Undefined.*?\/Undefined).*?\")"
+    r"(?P<object>\".*?\")"
     r".*$"
 )
 
@@ -20,16 +21,35 @@ host_app_user_pattern = re.compile(
     r"(?P<file>[^/\\]+$)"       # file segment
 )
 
+host_app_user_pattern_syncthing = re.compile(
+    r"^\/mnt\/j\/"
+    r"(?P<host>.+)_history-files\/"
+    r"((?P<stversions>\.stversions)\/)?"    # optional .stversions folder
+    r"((?P<host_600>.+)_opt\/)?"            # optional match for AV600 paths
+    r"(?P<app>.+?)\/prog\/curdir\/"
+    r"(?P<user>.+)\/"
+    r"(?P<file>.*)$"
+)
+
 date_pattern = re.compile(
     r"^(?P<date>\d{4}-\d{2}-\d{2})"
     r".*$"
 )
 
-if __name__ == "__main__":
+def main():
     records = []  # collect rows here
-    results = find_history_files(".")
+    results = []  # collect files paths here
+    objects_counter = 1
+
+    base = Path("/mnt/j")
+    matches: list[Path] = []
+    matches.extend(list(base.glob("*history*/*/prog/curdir/*")))
+
+    for m in matches:
+        results.extend(find_history_files(str(m.absolute())))
+
     for path in results:
-        match_hauf = host_app_user_pattern.search(path)
+        match_hauf = host_app_user_pattern_syncthing.search(path)
         if match_hauf:
             host: str|None = match_hauf.group("host")
             app: str|None = match_hauf.group("app")
@@ -61,7 +81,7 @@ if __name__ == "__main__":
                         if in_object_match:
                             userdir= in_object_match.group("userdir")
 
-                        print(f"{date} {time} {host} {app} {user} {userdir} {object}")
+                        print(f"[{objects_counter}] Object found: {date} {time} {host} {app} {user} {userdir} {object}")
                         # append a structured record
                         records.append({
                             "date": date,
@@ -73,6 +93,8 @@ if __name__ == "__main__":
                             "userdir": userdir,
                             "object": object,
                         })
+
+                        objects_counter += 1
     
     # export to Excel
     df = pd.DataFrame(records)
@@ -97,3 +119,6 @@ if __name__ == "__main__":
                 (col_cells,) = ws.iter_cols(min_col=col_idx, max_col=col_idx)
                 for cell in col_cells:
                     cell.number_format = fmt
+
+if __name__ == "__main__":
+    main()
