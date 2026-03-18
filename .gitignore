@@ -1,7 +1,8 @@
 .vscode/
-AvanceNeo400/
+*.txt
+*.xlsx
 AV300/
 AV600-nmrsu/
+AvanceNeo400/
 PharmaScan/
 __pycache__/
-*.xlsx
