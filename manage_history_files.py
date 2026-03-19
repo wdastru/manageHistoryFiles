@@ -222,7 +222,7 @@ def main():
 
     for file_counter, path in enumerate(results, start=1):
 
-        match = host_app_user_pattern_syncthing.search(path)
+        match = host_app_user_pattern_syncthing.search(str(path))
         
         if match:
             host: str|None = match.group("host")

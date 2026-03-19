@@ -49,7 +49,7 @@ def main():
         results.extend(find_history_files(str(m.absolute())))
 
     for path in results:
-        match_hauf = host_app_user_pattern_syncthing.search(path)
+        match_hauf = host_app_user_pattern_syncthing.search(str(path))
         if match_hauf:
             host: str|None = match_hauf.group("host")
             app: str|None = match_hauf.group("app")

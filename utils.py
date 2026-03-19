@@ -7,14 +7,13 @@ from termcolor import colored
 def max_index(filename: str, dest_dir: Path) -> int:
     # Look for files named 'stem.<n>' and 'stem.<n>.gz' in the same directory
     # Matches 'name.<number>' or 'name.<number>.gz' (for compressed rotations)
-    #_suffix_re = re.compile(r"\.(\d+)$")
     _suffix_re = re.compile(r"\.(?P<number>\d+)(?:\.gz)?$")
     
     # Look for files named 'stem.<n>' and 'stem.<n>.gz' in the same directory
     max_n = 0
     for p in dest_dir.glob(f"{filename}*"):
         m = _suffix_re.search(p.name)
-        if m :
+        if m:
             try:
                 n = int(m.group("number"))
                 if n > max_n:
